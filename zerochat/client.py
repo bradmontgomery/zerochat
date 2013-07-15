@@ -63,6 +63,7 @@ class ZeroClient(object):
         return "{0} {1}".format(self.channel, msg)
 
     def read_input(self):
+        """Reads user input from the Terminal."""
         self.reader.read()
         msg = self.reader.get_input()
         if msg:
@@ -74,19 +75,30 @@ class ZeroClient(object):
             msg = self._format_message(msg)
             self.send_socket.send(msg)
 
-    def receive(self):
-        """Receive/print any published messages."""
-        msg = self.pubsub_socket.recv()
-        if msg:
-            msg = "{0}\n{1}\n".format(msg, '-' * len(msg))
-            stdout.write(msg)
+    def receive(self, timeout=100):
+        """Receive/print any published messages.
+
+        Uses polling to keep from blocking when there are no messages to
+        receive. Default timeout is 100ms.
+
+        """
+        # Poll to see if there's anything to receive
+        if self.pubsub_socket.poll(timeout=timeout) > 0:
+            # We have a message, so receive it!
+            msg = self.pubsub_socket.recv()
+            if msg:
+                self.print_message(msg)
+
+    def print_message(self, msg):
+        """Prints received messages to stdout."""
+        stdout.write("\n{0}\n".format(msg))
+        stdout.flush()
 
     def run(self):
         while True:
             msg = self.read_input()  # Read input message from user
             self.send(msg)  # Send messages to chat server
             self.receive()  # Receive any published messages
-            stdout.flush()
 
 
 if __name__ == "__main__":
