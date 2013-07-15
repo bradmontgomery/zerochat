@@ -7,6 +7,8 @@ TODO:
 
 """
 from sys import argv, stdout, stderr
+
+import re
 import time
 import zmq
 
@@ -55,11 +57,29 @@ class ZeroServer(object):
         self.pubsub_socket.bind(self.pubsub_connection_string)
 
     def recv_message(self):
+        """Receives messages from the socket, and determines if there's any
+        content worth publishing."""
         msg = self.recv_socket.recv()
+        return self.validate_message(msg)
+
+    def validate_message(self, msg):
+        """All received message strings have a "channel" prefix of the form:
+
+            '[CHANNEL] The users's message here'
+
+        To determine if we've got an empty message, we've got to strip off
+        the channel bit, and see if there's anything left
+
+        """
         msg = msg.strip()
-        if msg and self.verbose:
+        stripped_message = re.sub('^\[.+\]', '', msg).strip()
+        if stripped_message and self.verbose:
             stdout.write("[{0}] RECV: '{1}'\n".format(time.ctime(), msg))
-        return msg or None
+
+        # If there's anything left after stripping off the channel prefix, then
+        # we have a non-empty message; forward it on.
+        if stripped_message:
+            return msg
 
     def publish_message(self, msg):
         self.pubsub_socket.send(msg)
