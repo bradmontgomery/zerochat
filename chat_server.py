@@ -18,6 +18,7 @@ RECV_PORT = "5556"
 class ZeroServer(object):
 
     def __init__(self, *args, **kwargs):
+        self.verbose = kwargs.get('verbose', False)
         self.host = kwargs.get('host', HOST)
 
         # Port on which the server receives messages
@@ -62,9 +63,15 @@ class ZeroServer(object):
         while True:
             # Receive a message...
             message = self.recv_socket.recv()
+            if self.verbose:
+                stdout.write("RECV: '{0}'\n".format(message))
 
             # Publish the message for subscribers
             self.pubsub_socket.send(message)
+            if self.verbose:
+                stdout.write("PUB: '{0}'\n".format(message))
+
+            stdout.flush()
 
 
 if __name__ == "__main__":
@@ -82,5 +89,10 @@ if __name__ == "__main__":
     elif len(argv) == 2:
         HOST = argv[1]
 
-    z = ZeroServer(host=HOST, pubsub_port=PUBSUB_PORT, recv_port=RECV_PORT)
+    z = ZeroServer(
+        host=HOST,
+        pubsub_port=PUBSUB_PORT,
+        recv_port=RECV_PORT,
+        verbose=True
+    )
     z.run()
