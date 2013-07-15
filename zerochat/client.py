@@ -8,7 +8,7 @@ TODO:
   happening in the background
 
 """
-
+from reader import NonblockingStdinReader
 from sys import argv, stderr, stdout
 import zmq
 
@@ -41,6 +41,9 @@ class ZeroClient(object):
         self._create_send_socket()
         self._create_pubsub_socket()
 
+        # to do non-blocking reads from stdin
+        self.reader = NonblockingStdinReader()
+
     def _create_context(self):
         self.context = zmq.Context()
 
@@ -56,26 +59,33 @@ class ZeroClient(object):
         self.pubsub_socket.setsockopt(zmq.SUBSCRIBE, self.channel)
 
     def _format_message(self, msg):
-        # add in the channel info
+        """Adds in the Channel information."""
         return "{0} {1}".format(self.channel, msg)
 
-    def _read_message(self):
-        msg = raw_input("MESSAGE: ")  # this'll block :-/
-        return self._format_message(msg)
+    def read_input(self):
+        self.reader.read()
+        msg = self.reader.get_input()
+        if msg:
+            return msg
+
+    def send(self, msg):
+        """Send messages to the server."""
+        if msg:
+            msg = self._format_message(msg)
+            self.send_socket.send(msg)
+
+    def receive(self):
+        """Receive/print any published messages."""
+        msg = self.pubsub_socket.recv()
+        if msg:
+            msg = "{0}\n{1}\n".format(msg, '-' * len(msg))
+            stdout.write(msg)
 
     def run(self):
-
         while True:
-            msg = self._read_message()
-            msg = msg.strip()
-            if msg:
-                self.send_socket.send(msg)
-
-            # Receive any published messages
-            msg = self.pubsub_socket.recv()
-            if msg:
-                msg = "{0}\n{1}\n".format(msg, '-' * len(msg))
-                stdout.write(msg)
+            msg = self.read_input()  # Read input message from user
+            self.send(msg)  # Send messages to chat server
+            self.receive()  # Receive any published messages
             stdout.flush()
 
 
