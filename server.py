@@ -7,6 +7,7 @@ TODO:
 
 """
 from sys import argv, stdout, stderr
+import time
 import zmq
 
 
@@ -53,6 +54,18 @@ class ZeroServer(object):
         self.pubsub_socket = self.context.socket(zmq.PUB)
         self.pubsub_socket.bind(self.pubsub_connection_string)
 
+    def recv_message(self):
+        msg = self.recv_socket.recv()
+        msg = msg.strip()
+        if msg and self.verbose:
+            stdout.write("[{0}] RECV: '{1}'\n".format(time.ctime(), msg))
+        return msg or None
+
+    def publish_message(self, msg):
+        self.pubsub_socket.send(msg)
+        if self.verbose:
+            stdout.write("[{0}] PUB: '{1}'\n".format(time.ctime(), msg))
+
     def run(self):
         stdout.write("\nZero Server running:\n")
         stdout.write(" - Listening on '{0}'\n".format(
@@ -62,16 +75,14 @@ class ZeroServer(object):
 
         while True:
             # Receive a message...
-            message = self.recv_socket.recv()
-            if self.verbose:
-                stdout.write("RECV: '{0}'\n".format(message))
+            message = self.recv_message()
 
             # Publish the message for subscribers
-            self.pubsub_socket.send(message)
-            if self.verbose:
-                stdout.write("PUB: '{0}'\n".format(message))
+            if message:
+                self.publish_message(message)
 
-            stdout.flush()
+            if self.verbose:
+                stdout.flush()
 
 
 if __name__ == "__main__":
