@@ -66,14 +66,14 @@ class ZeroServer(object):
     def validate_message(self, msg):
         """All received message strings have a "channel" prefix of the form:
 
-            '[CHANNEL] The users's message here'
+            '[CHANNEL] Username: The users's message here'
 
         To determine if we've got an empty message, we've got to strip off
         the channel bit, and see if there's anything left
 
         """
         msg = msg.strip()
-        stripped_message = re.sub('^\[.+\]', '', msg).strip()
+        stripped_message = re.sub('^\[.+\] .+:', '', msg).strip()
         if stripped_message and self.verbose:
             stdout.write("[{0}] RECV: '{1}'\n".format(time.ctime(), msg))
 
