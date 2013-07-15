@@ -23,10 +23,11 @@ SEND_PORT = "5556"  # Server's Recv port
 class ZeroClient(object):
 
     def __init__(self, *args, **kwargs):
+        self.username = kwargs.get('username', 'Anon')
         self.host = kwargs.get('host', HOST)
 
         # Set the channel string; format is `[channel_name]`
-        channel = kwargs.get('channel', 'global').strip().upper()
+        channel = kwargs.get('channel', CHANNEL).strip().upper()
         self.channel = "[{0}]".format(channel)
 
         self.send_port = kwargs.get('send_port', SEND_PORT)
@@ -63,7 +64,7 @@ class ZeroClient(object):
 
     def _format_message(self, msg):
         """Adds in the Channel information."""
-        return "{0} {1}".format(self.channel, msg)
+        return "{0} {1}: {2}".format(self.channel, self.username, msg)
 
     def read_input(self):
         """Reads user input from the Terminal."""
@@ -105,15 +106,14 @@ class ZeroClient(object):
 
 
 if __name__ == "__main__":
-    """
-    USAGE: python client
-        --channel
-        --host
-        --pubsub_port
-        --send_port
 
-    """
     parser = argparse.ArgumentParser(description='Run a zerochat client')
+    # Username Argument
+    parser.add_argument('-u', '--username',
+        default='Anon',
+        type=str,
+        help='Your chat username'
+    )
     # Channel Argument
     parser.add_argument('-c', '--channel',
         default=CHANNEL,
@@ -142,6 +142,7 @@ if __name__ == "__main__":
     params = parser.parse_args()
     z = ZeroClient(
         channel=params.channel,
+        username=params.username,
         host=params.host,
         pubsub_port=params.pubsub_port,
         send_port=params.send_port
