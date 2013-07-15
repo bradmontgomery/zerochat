@@ -8,10 +8,13 @@ TODO:
   happening in the background
 
 """
+import argparse
+
 from reader import NonblockingStdinReader
-from sys import argv, stderr, stdout
+from sys import stdout
 import zmq
 
+CHANNEL = 'GLOBAL'  # The default channel for messages
 HOST = "localhost"  # Server Hostname or address
 PUBSUB_PORT = "5555"  # Server's Pub/Sub port
 SEND_PORT = "5556"  # Server's Recv port
@@ -102,29 +105,45 @@ class ZeroClient(object):
 
 
 if __name__ == "__main__":
+    """
+    USAGE: python client
+        --channel
+        --host
+        --pubsub_port
+        --send_port
 
-    channel = "global"
-    num_args = len(argv)
-    if num_args not in [1, 2, 3, 5]:
-        stderr.write("\nUSAGE: python chat_client [channel]"
-                     " [host] [pubsub_port] [send_port]\n")
-        quit()
+    """
+    parser = argparse.ArgumentParser(description='Run a zerochat client')
+    # Channel Argument
+    parser.add_argument('-c', '--channel',
+        default=CHANNEL,
+        type=str,
+        help='The channel to which you wish to connect.'
+    )
+    # Host argument
+    parser.add_argument('-H', '--host',
+        default=HOST,
+        type=str,
+        help='The hostname or IP address of the zerochat server'
+    )
+    # Pubsub Port argument
+    parser.add_argument('-p', '--pubsub_port',
+        default=PUBSUB_PORT,
+        type=int,
+        help='The port used to Subscribe to Published messages'
+    )
+    # Send Port argument
+    parser.add_argument('-s', '--send_port',
+        default=SEND_PORT,
+        type=int,
+        help='The port from which messages are Sent'
+    )
 
-    if num_args == 5:
-        channel, host, pubsub_port, send_port = argv[1:5]
-        HOST = host
-        PUBSUB_PORT = pubsub_port
-        SEND_PORT = send_port
-    elif num_args == 3:
-        channel, host = argv[1:3]
-        HOST = host
-    elif num_args == 2:
-        channel = argv[1]
-
+    params = parser.parse_args()
     z = ZeroClient(
-        channel=channel,
-        host=HOST,
-        pubsub_port=PUBSUB_PORT,
-        send_port=SEND_PORT
+        channel=params.channel,
+        host=params.host,
+        pubsub_port=params.pubsub_port,
+        send_port=params.send_port
     )
     z.run()

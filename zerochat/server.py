@@ -6,7 +6,8 @@ TODO:
 * support names for users (wo we know who's saying what)?
 
 """
-from sys import argv, stdout, stderr
+import argparse
+from sys import stdout
 
 import re
 import time
@@ -106,24 +107,40 @@ class ZeroServer(object):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Run a zerochat server')
+    # Host argument
+    parser.add_argument('-H', '--host',
+        dest="host",
+        default=HOST,
+        type=str,
+        help='The hostname or IP address on which to bind (default: *)'
+    )
+    # Pubsub Port argument
+    parser.add_argument('-p', '--pubsub_port',
+        dest='pubsub_port',
+        default=PUBSUB_PORT,
+        type=int,
+        help='The port on which messages are Published'
+    )
+    # Receive Port argument
+    parser.add_argument('-r', '--recv_port',
+        dest='recv_port',
+        default=RECV_PORT,
+        type=int,
+        help='The port on which messages are Received'
+    )
+    # Verbosity argument
+    parser.add_argument('-v', '--verbose',
+        dest='verbose',
+        action='store_true',
+        help='The port on which messages are Received'
+    )
 
-    num_args = len(argv)
-    if num_args not in [4, 2, 1]:
-        stderr.write("\nUSAGE: python chat_server <host> "
-                     "[pubsub_port] [recv_port]\n")
-        quit()
-
-    if len(argv) == 4:
-        HOST = argv[1]
-        PUBSUB_PORT = argv[2]
-        RECV_PORT = argv[3]
-    elif len(argv) == 2:
-        HOST = argv[1]
-
+    params = parser.parse_args()
     z = ZeroServer(
-        host=HOST,
-        pubsub_port=PUBSUB_PORT,
-        recv_port=RECV_PORT,
-        verbose=True
+        host=params.host,
+        pubsub_port=params.pubsub_port,
+        recv_port=params.recv_port,
+        verbose=params.verbose
     )
     z.run()
