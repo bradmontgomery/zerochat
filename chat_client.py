@@ -64,16 +64,19 @@ class ZeroClient(object):
         return self._format_message(msg)
 
     def run(self):
-        self._set_nonblocking_input()
 
         while True:
             msg = self._read_message()
-            self.send_socket.send(msg)
+            msg = msg.strip()
+            if msg:
+                self.send_socket.send(msg)
 
             # Receive any published messages
             msg = self.pubsub_socket.recv()
-            msg = "{0}\n{1}\n".format(msg, '-' * len(msg))
-            stdout.write(msg)
+            if msg:
+                msg = "{0}\n{1}\n".format(msg, '-' * len(msg))
+                stdout.write(msg)
+            stdout.flush()
 
 
 if __name__ == "__main__":
