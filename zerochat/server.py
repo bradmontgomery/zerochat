@@ -1,18 +1,21 @@
 """
-
 A dead-simple command-line chat server using ZeroMQ.
 
 TODO:
-* support names for users (wo we know who's saying what)?
+
+* support names for users (so we know who's saying what)?
+* support for persisting messages?
+* include server-side time of message before sending it on?
+* support for creating / connecting to a specified channel?
+* announce user join / leaving?
 
 """
 import argparse
-from sys import stdout
-
 import re
 import time
-import zmq
+from sys import stdout
 
+import zmq
 
 HOST = "*"  # hostname or address to listen on
 PUBSUB_PORT = "5555"
@@ -20,24 +23,17 @@ RECV_PORT = "5556"
 
 
 class ZeroServer(object):
-
     def __init__(self, *args, **kwargs):
-        self.verbose = kwargs.get('verbose', False)
-        self.host = kwargs.get('host', HOST)
+        self.verbose = kwargs.get("verbose", False)
+        self.host = kwargs.get("host", HOST)
 
         # Port on which the server receives messages
-        self.recv_port = kwargs.get('recv_port', RECV_PORT)
-        self.recv_connection_string = "tcp://{host}:{port}".format(
-            host=self.host,
-            port=self.recv_port
-        )
+        self.recv_port = kwargs.get("recv_port", RECV_PORT)
+        self.recv_connection_string = f"tcp://{self.host}:{self.recv_port}"
 
         # Port on which server publishes messages
-        self.pubsub_port = kwargs.get('pubsub_port', PUBSUB_PORT)
-        self.pubsub_connection_string = "tcp://{host}:{port}".format(
-            host=self.host,
-            port=self.pubsub_port
-        )
+        self.pubsub_port = kwargs.get("pubsub_port", PUBSUB_PORT)
+        self.pubsub_connection_string = f"tcp://{self.host}:{self.pubsub_port}"
 
         # Set up the networking
         self._create_context()
@@ -72,27 +68,27 @@ class ZeroServer(object):
         the channel bit, and see if there's anything left
 
         """
-        msg = msg.strip()
-        stripped_message = re.sub('^\[.+\] .+:', '', msg).strip()
+        msg = msg.decode("utf8").strip()
+        stripped_message = re.sub(r"^\[.+\] .+:", "", msg).strip()
         if stripped_message and self.verbose:
             stdout.write("[{0}] RECV: '{1}'\n".format(time.ctime(), msg))
 
         # If there's anything left after stripping off the channel prefix, then
         # we have a non-empty message; forward it on.
         if stripped_message:
-            return msg
+            return msg.encode("utf8")
 
     def publish_message(self, msg):
         self.pubsub_socket.send(msg)
         if self.verbose:
-            stdout.write("[{0}] PUB: '{1}'\n".format(time.ctime(), msg))
+            t = time.ctime()
+            msg = msg.decode("utf8")
+            stdout.write(f"[{t}] PUB: '{msg}'\n")
 
     def run(self):
         stdout.write("\nZero Server running:\n")
-        stdout.write(" - Listening on '{0}'\n".format(
-            self.recv_connection_string))
-        stdout.write(" - Publishing to '{0}'\n".format(
-            self.pubsub_connection_string))
+        stdout.write(f" - Listening on '{self.recv_connection_string}'\n")
+        stdout.write(f" - Publishing to '{self.pubsub_connection_string}'\n")
 
         while True:
             # Receive a message...
@@ -107,33 +103,41 @@ class ZeroServer(object):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Run a zerochat server')
+    parser = argparse.ArgumentParser(description="Run a zerochat server")
     # Host argument
-    parser.add_argument('-H', '--host',
+    parser.add_argument(
+        "-H",
+        "--host",
         dest="host",
         default=HOST,
         type=str,
-        help='The hostname or IP address on which to bind (default: *)'
+        help="The hostname or IP address on which to bind (default: *)",
     )
     # Pubsub Port argument
-    parser.add_argument('-p', '--pubsub_port',
-        dest='pubsub_port',
+    parser.add_argument(
+        "-p",
+        "--pubsub_port",
+        dest="pubsub_port",
         default=PUBSUB_PORT,
         type=int,
-        help='The port on which messages are Published'
+        help="The port on which messages are Published",
     )
     # Receive Port argument
-    parser.add_argument('-r', '--recv_port',
-        dest='recv_port',
+    parser.add_argument(
+        "-r",
+        "--recv_port",
+        dest="recv_port",
         default=RECV_PORT,
         type=int,
-        help='The port on which messages are Received'
+        help="The port on which messages are Received",
     )
     # Verbosity argument
-    parser.add_argument('-v', '--verbose',
-        dest='verbose',
-        action='store_true',
-        help='The port on which messages are Received'
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        help="The port on which messages are Received",
     )
 
     params = parser.parse_args()
@@ -141,6 +145,6 @@ if __name__ == "__main__":
         host=params.host,
         pubsub_port=params.pubsub_port,
         recv_port=params.recv_port,
-        verbose=params.verbose
+        verbose=params.verbose,
     )
     z.run()
