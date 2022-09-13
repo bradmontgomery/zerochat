@@ -1,0 +1,12 @@
+black
+build
+flake8
+isort
+mypy
+pip-tools
+pre-commit
+pytest
+pytest-cov
+twine
+rich
+pyzmq
