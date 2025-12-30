@@ -10,6 +10,7 @@ TODO:
 * announce user join / leaving?
 
 """
+
 import argparse
 import re
 import time
@@ -102,7 +103,7 @@ class ZeroServer(object):
                 stdout.flush()
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Run a zerochat server")
     # Host argument
     parser.add_argument(
@@ -148,3 +149,7 @@ if __name__ == "__main__":
         verbose=params.verbose,
     )
     z.run()
+
+
+if __name__ == "__main__":
+    main()

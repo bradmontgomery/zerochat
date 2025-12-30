@@ -8,11 +8,13 @@ TODO:
 * don't block on input so we can see the chat happening in the background
 
 """
+
 import argparse
 from sys import stdout
 
 import zmq
-from reader import NonblockingStdinReader
+
+from .reader import NonblockingStdinReader
 
 CHANNEL = "GLOBAL"  # The default channel for messages
 HOST = "localhost"  # Server Hostname or address
@@ -99,13 +101,10 @@ class ZeroClient(object):
             self.receive()  # Receive any published messages
 
 
-if __name__ == "__main__":
-
+def main():
     parser = argparse.ArgumentParser(description="Run a zerochat client")
     # Username Argument
-    parser.add_argument(
-        "-u", "--username", default="Anon", type=str, help="Your chat username"
-    )
+    parser.add_argument("-u", "--username", default="Anon", type=str, help="Your chat username")
     # Channel Argument
     parser.add_argument(
         "-c",
@@ -148,3 +147,7 @@ if __name__ == "__main__":
         send_port=params.send_port,
     )
     z.run()
+
+
+if __name__ == "__main__":
+    main()
