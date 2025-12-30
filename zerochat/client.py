@@ -85,10 +85,19 @@ class ZeroClient:
         """Adds in the Channel information."""
         return f"{self.channel} {self.username}: {msg}"
 
+    def _get_prompt(self) -> str:
+        """Return a styled prompt string for user input."""
+        return f"[bold green]{self.username}>[/bold green] "
+
+    def _print_prompt(self) -> None:
+        """Print the input prompt without a newline."""
+        self.console.print(self._get_prompt(), end="")
+
     async def read_and_send(self) -> None:
         """Read user input and send messages to the server."""
         while True:
             try:
+                self._print_prompt()
                 msg = await ainput("")
                 if msg.strip():
                     formatted = self._format_message(msg.strip())
