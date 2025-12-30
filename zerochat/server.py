@@ -21,11 +21,8 @@ import zmq
 import zmq.asyncio
 from rich.console import Console
 
+from .config import DEFAULT_PUBSUB_PORT, DEFAULT_RECV_PORT, DEFAULT_SERVER_HOST
 from .logging import setup_logging
-
-HOST: str = "*"  # hostname or address to listen on
-PUBSUB_PORT: str = "5555"
-RECV_PORT: str = "5556"
 
 
 class ZeroServer:
@@ -33,9 +30,9 @@ class ZeroServer:
         self,
         *,
         verbose: bool = False,
-        host: str = HOST,
-        recv_port: str | int = RECV_PORT,
-        pubsub_port: str | int = PUBSUB_PORT,
+        host: str = DEFAULT_SERVER_HOST,
+        recv_port: str | int = DEFAULT_RECV_PORT,
+        pubsub_port: str | int = DEFAULT_PUBSUB_PORT,
         log_file: Path | None = None,
         log_to_console: bool = False,
     ) -> None:
@@ -163,34 +160,30 @@ class ZeroServer:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run a zerochat server")
-    # Host argument
     parser.add_argument(
         "-H",
         "--host",
         dest="host",
-        default=HOST,
+        default=DEFAULT_SERVER_HOST,
         type=str,
         help="The hostname or IP address on which to bind (default: *)",
     )
-    # Pubsub Port argument
     parser.add_argument(
         "-p",
         "--pubsub_port",
         dest="pubsub_port",
-        default=PUBSUB_PORT,
+        default=DEFAULT_PUBSUB_PORT,
         type=int,
         help="The port on which messages are Published",
     )
-    # Receive Port argument
     parser.add_argument(
         "-r",
         "--recv_port",
         dest="recv_port",
-        default=RECV_PORT,
+        default=DEFAULT_RECV_PORT,
         type=int,
         help="The port on which messages are Received",
     )
-    # Verbosity argument
     parser.add_argument(
         "-v",
         "--verbose",
@@ -198,7 +191,6 @@ def main() -> None:
         action="store_true",
         help="Enable verbose output",
     )
-    # Log file argument
     parser.add_argument(
         "--log-file",
         dest="log_file",
@@ -206,7 +198,6 @@ def main() -> None:
         default=None,
         help="Path to log file (default: ~/.zerochat/logs/server.log)",
     )
-    # Log to console argument
     parser.add_argument(
         "--log-console",
         dest="log_console",

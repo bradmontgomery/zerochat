@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 from pathlib import Path
 
 import zmq
@@ -19,27 +20,31 @@ from aioconsole import ainput
 from rich.console import Console
 from rich.text import Text
 
+from .config import (
+    DEFAULT_CHANNEL,
+    DEFAULT_HOST,
+    DEFAULT_PUBSUB_PORT,
+    DEFAULT_SEND_PORT,
+    DEFAULT_USERNAME,
+    validate_channel,
+    validate_username,
+)
 from .logging import setup_logging
-
-CHANNEL: str = "GLOBAL"  # The default channel for messages
-HOST: str = "localhost"  # Server Hostname or address
-PUBSUB_PORT: str = "5555"  # Server's Pub/Sub port
-SEND_PORT: str = "5556"  # Server's Recv port
 
 
 class ZeroClient:
     def __init__(
         self,
         *,
-        username: str = "Anon",
-        host: str = HOST,
-        channel: str = CHANNEL,
-        send_port: str | int = SEND_PORT,
-        pubsub_port: str | int = PUBSUB_PORT,
+        username: str = DEFAULT_USERNAME,
+        host: str = DEFAULT_HOST,
+        channel: str = DEFAULT_CHANNEL,
+        send_port: str | int = DEFAULT_SEND_PORT,
+        pubsub_port: str | int = DEFAULT_PUBSUB_PORT,
         log_file: Path | None = None,
         log_to_console: bool = False,
     ) -> None:
-        self.username: str = username
+        self.username: str = validate_username(username)
         self.host: str = host
         self.console: Console = Console()
         self.logger = setup_logging(
@@ -48,9 +53,9 @@ class ZeroClient:
             console=log_to_console,
         )
 
-        # Set the channel string; format is `[channel_name]`
-        self.channel: str = f"[{channel.strip().upper()}]"
-        self.channel_name: str = channel.strip().upper()
+        # Validate and set the channel string; format is `[channel_name]`
+        self.channel_name: str = validate_channel(channel)
+        self.channel: str = f"[{self.channel_name}]"
 
         self.send_port: str | int = send_port
         self.send_connection_string: str = f"tcp://{self.host}:{self.send_port}"
@@ -165,41 +170,37 @@ class ZeroClient:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run a zerochat client")
-    # Username Argument
-    parser.add_argument("-u", "--username", default="Anon", type=str, help="Your chat username")
-    # Channel Argument
+    parser.add_argument(
+        "-u", "--username", default=DEFAULT_USERNAME, type=str, help="Your chat username"
+    )
     parser.add_argument(
         "-c",
         "--channel",
-        default=CHANNEL,
+        default=DEFAULT_CHANNEL,
         type=str,
         help="The channel to which you wish to connect.",
     )
-    # Host argument
     parser.add_argument(
         "-H",
         "--host",
-        default=HOST,
+        default=DEFAULT_HOST,
         type=str,
         help="The hostname or IP address of the zerochat server",
     )
-    # Pubsub Port argument
     parser.add_argument(
         "-p",
         "--pubsub_port",
-        default=PUBSUB_PORT,
+        default=DEFAULT_PUBSUB_PORT,
         type=int,
         help="The port used to Subscribe to Published messages",
     )
-    # Send Port argument
     parser.add_argument(
         "-s",
         "--send_port",
-        default=SEND_PORT,
+        default=DEFAULT_SEND_PORT,
         type=int,
         help="The port from which messages are Sent",
     )
-    # Log file argument
     parser.add_argument(
         "--log-file",
         dest="log_file",
@@ -207,7 +208,6 @@ def main() -> None:
         default=None,
         help="Path to log file (default: ~/.zerochat/logs/client.log)",
     )
-    # Log to console argument
     parser.add_argument(
         "--log-console",
         dest="log_console",
@@ -216,11 +216,21 @@ def main() -> None:
     )
 
     params = parser.parse_args()
+    console = Console()
+
+    # Validate inputs before creating client
+    try:
+        validated_username = validate_username(params.username)
+        validated_channel = validate_channel(params.channel)
+    except ValueError as e:
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        sys.exit(1)
+
     logger = setup_logging("zerochat.client", log_file=params.log_file, console=params.log_console)
 
     client = ZeroClient(
-        channel=params.channel,
-        username=params.username,
+        channel=validated_channel,
+        username=validated_username,
         host=params.host,
         pubsub_port=params.pubsub_port,
         send_port=params.send_port,
@@ -235,11 +245,11 @@ def main() -> None:
             "Client disconnected by user",
             extra={
                 "event": "client_disconnect",
-                "username": params.username,
-                "channel": params.channel.strip().upper(),
+                "username": validated_username,
+                "channel": validated_channel,
             },
         )
-        Console().print("\n[bold red]Disconnected.[/bold red]")
+        console.print("\n[bold red]Disconnected.[/bold red]")
 
 
 if __name__ == "__main__":
