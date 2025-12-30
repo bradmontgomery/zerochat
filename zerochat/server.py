@@ -3,7 +3,6 @@ A dead-simple command-line chat server using ZeroMQ.
 
 TODO:
 
-* support names for users (so we know who's saying what)?
 * support for persisting messages?
 * include server-side time of message before sending it on?
 * support for creating / connecting to a specified channel?
@@ -14,12 +13,13 @@ TODO:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import re
 import time
-from sys import stdout
-from typing import NoReturn
 
 import zmq
+import zmq.asyncio
+from rich.console import Console
 
 HOST: str = "*"  # hostname or address to listen on
 PUBSUB_PORT: str = "5555"
@@ -37,6 +37,7 @@ class ZeroServer:
     ) -> None:
         self.verbose: bool = verbose
         self.host: str = host
+        self.console: Console = Console()
 
         # Port on which the server receives messages
         self.recv_port: str | int = recv_port
@@ -52,22 +53,22 @@ class ZeroServer:
         self._create_pubsub_socket()
 
     def _create_context(self) -> None:
-        self.context: zmq.Context[zmq.Socket[bytes]] = zmq.Context()
+        self.context: zmq.asyncio.Context = zmq.asyncio.Context()
 
     def _create_recv_socket(self) -> None:
         # Receive Socket: To receive messages
-        self.recv_socket: zmq.Socket[bytes] = self.context.socket(zmq.PULL)
+        self.recv_socket: zmq.asyncio.Socket = self.context.socket(zmq.PULL)
         self.recv_socket.bind(self.recv_connection_string)
 
     def _create_pubsub_socket(self) -> None:
         # Pub/Sub socket: To Publish Chat Messages
-        self.pubsub_socket: zmq.Socket[bytes] = self.context.socket(zmq.PUB)
+        self.pubsub_socket: zmq.asyncio.Socket = self.context.socket(zmq.PUB)
         self.pubsub_socket.bind(self.pubsub_connection_string)
 
-    def recv_message(self) -> bytes | None:
+    async def recv_message(self) -> bytes | None:
         """Receives messages from the socket, and determines if there's any
         content worth publishing."""
-        msg = self.recv_socket.recv()
+        msg = await self.recv_socket.recv()
         return self.validate_message(msg)
 
     def validate_message(self, msg: bytes) -> bytes | None:
@@ -82,7 +83,7 @@ class ZeroServer:
         decoded_msg = msg.decode("utf8").strip()
         stripped_message = re.sub(r"^\[.+\] .+:", "", decoded_msg).strip()
         if stripped_message and self.verbose:
-            stdout.write("[{0}] RECV: '{1}'\n".format(time.ctime(), decoded_msg))
+            self.console.print(f"[dim][{time.ctime()}][/dim] [cyan]RECV:[/cyan] '{decoded_msg}'")
 
         # If there's anything left after stripping off the channel prefix, then
         # we have a non-empty message; forward it on.
@@ -90,31 +91,28 @@ class ZeroServer:
             return decoded_msg.encode("utf8")
         return None
 
-    def publish_message(self, msg: bytes) -> None:
-        self.pubsub_socket.send(msg)
+    async def publish_message(self, msg: bytes) -> None:
+        await self.pubsub_socket.send(msg)
         if self.verbose:
             t = time.ctime()
             decoded_msg = msg.decode("utf8")
-            stdout.write(f"[{t}] PUB: '{decoded_msg}'\n")
+            self.console.print(f"[dim][{t}][/dim] [green]PUB:[/green] '{decoded_msg}'")
 
-    def run(self) -> NoReturn:
-        stdout.write("\nZero Server running:\n")
-        stdout.write(f" - Listening on '{self.recv_connection_string}'\n")
-        stdout.write(f" - Publishing to '{self.pubsub_connection_string}'\n")
+    async def run(self) -> None:
+        self.console.print("\n[bold green]Zero Server running:[/bold green]")
+        self.console.print(f" - Listening on [cyan]'{self.recv_connection_string}'[/cyan]")
+        self.console.print(f" - Publishing to [cyan]'{self.pubsub_connection_string}'[/cyan]\n")
 
         while True:
             # Receive a message...
-            message = self.recv_message()
+            message = await self.recv_message()
 
             # Publish the message for subscribers
             if message:
-                self.publish_message(message)
-
-            if self.verbose:
-                stdout.flush()
+                await self.publish_message(message)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Run a zerochat server")
     # Host argument
     parser.add_argument(
@@ -149,17 +147,21 @@ def main():
         "--verbose",
         dest="verbose",
         action="store_true",
-        help="The port on which messages are Received",
+        help="Enable verbose output",
     )
 
     params = parser.parse_args()
-    z = ZeroServer(
+    server = ZeroServer(
         host=params.host,
         pubsub_port=params.pubsub_port,
         recv_port=params.recv_port,
         verbose=params.verbose,
     )
-    z.run()
+
+    try:
+        asyncio.run(server.run())
+    except KeyboardInterrupt:
+        Console().print("\n[bold red]Server stopped.[/bold red]")
 
 
 if __name__ == "__main__":
