@@ -11,12 +11,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from pathlib import Path
 
 import zmq
 import zmq.asyncio
 from aioconsole import ainput
 from rich.console import Console
 from rich.text import Text
+
+from .logging import setup_logging
 
 CHANNEL: str = "GLOBAL"  # The default channel for messages
 HOST: str = "localhost"  # Server Hostname or address
@@ -33,13 +36,21 @@ class ZeroClient:
         channel: str = CHANNEL,
         send_port: str | int = SEND_PORT,
         pubsub_port: str | int = PUBSUB_PORT,
+        log_file: Path | None = None,
+        log_to_console: bool = False,
     ) -> None:
         self.username: str = username
         self.host: str = host
         self.console: Console = Console()
+        self.logger = setup_logging(
+            "zerochat.client",
+            log_file=log_file,
+            console=log_to_console,
+        )
 
         # Set the channel string; format is `[channel_name]`
         self.channel: str = f"[{channel.strip().upper()}]"
+        self.channel_name: str = channel.strip().upper()
 
         self.send_port: str | int = send_port
         self.send_connection_string: str = f"tcp://{self.host}:{self.send_port}"
@@ -77,7 +88,16 @@ class ZeroClient:
                 if msg.strip():
                     formatted = self._format_message(msg.strip())
                     await self.send_socket.send(formatted.encode("utf8"))
+                    self.logger.debug(
+                        "Message sent",
+                        extra={
+                            "event": "message_sent",
+                            "channel": self.channel_name,
+                            "username": self.username,
+                        },
+                    )
             except EOFError:
+                self.logger.info("Input stream closed", extra={"event": "input_closed"})
                 break
 
     async def receive(self) -> None:
@@ -116,17 +136,31 @@ class ZeroClient:
 
     async def run(self) -> None:
         """Run the client with concurrent input and message receiving."""
+        self.logger.info(
+            "Client connecting",
+            extra={
+                "event": "client_connect",
+                "host": self.host,
+                "channel": self.channel_name,
+                "username": self.username,
+            },
+        )
+
         self.console.print(
             f"[bold green]Connected to {self.host}[/bold green] "
             f"[dim]channel={self.channel}[/dim]"
         )
         self.console.print("[dim]Type your message and press Enter to send.[/dim]\n")
 
-        # Run input reading and message receiving concurrently
-        await asyncio.gather(
-            self.read_and_send(),
-            self.receive(),
-        )
+        try:
+            # Run input reading and message receiving concurrently
+            await asyncio.gather(
+                self.read_and_send(),
+                self.receive(),
+            )
+        except Exception as e:
+            self.logger.exception("Client error", extra={"event": "client_error"})
+            raise e
 
 
 def main() -> None:
@@ -165,19 +199,46 @@ def main() -> None:
         type=int,
         help="The port from which messages are Sent",
     )
+    # Log file argument
+    parser.add_argument(
+        "--log-file",
+        dest="log_file",
+        type=Path,
+        default=None,
+        help="Path to log file (default: ~/.zerochat/logs/client.log)",
+    )
+    # Log to console argument
+    parser.add_argument(
+        "--log-console",
+        dest="log_console",
+        action="store_true",
+        help="Also log to console (stderr)",
+    )
 
     params = parser.parse_args()
+    logger = setup_logging("zerochat.client", log_file=params.log_file, console=params.log_console)
+
     client = ZeroClient(
         channel=params.channel,
         username=params.username,
         host=params.host,
         pubsub_port=params.pubsub_port,
         send_port=params.send_port,
+        log_file=params.log_file,
+        log_to_console=params.log_console,
     )
 
     try:
         asyncio.run(client.run())
     except KeyboardInterrupt:
+        logger.info(
+            "Client disconnected by user",
+            extra={
+                "event": "client_disconnect",
+                "username": params.username,
+                "channel": params.channel.strip().upper(),
+            },
+        )
         Console().print("\n[bold red]Disconnected.[/bold red]")
 
 

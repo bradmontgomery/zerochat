@@ -15,11 +15,13 @@ from __future__ import annotations
 import argparse
 import asyncio
 import re
-import time
+from pathlib import Path
 
 import zmq
 import zmq.asyncio
 from rich.console import Console
+
+from .logging import setup_logging
 
 HOST: str = "*"  # hostname or address to listen on
 PUBSUB_PORT: str = "5555"
@@ -34,10 +36,17 @@ class ZeroServer:
         host: str = HOST,
         recv_port: str | int = RECV_PORT,
         pubsub_port: str | int = PUBSUB_PORT,
+        log_file: Path | None = None,
+        log_to_console: bool = False,
     ) -> None:
         self.verbose: bool = verbose
         self.host: str = host
         self.console: Console = Console()
+        self.logger = setup_logging(
+            "zerochat.server",
+            log_file=log_file,
+            console=log_to_console,
+        )
 
         # Port on which the server receives messages
         self.recv_port: str | int = recv_port
@@ -65,6 +74,16 @@ class ZeroServer:
         self.pubsub_socket: zmq.asyncio.Socket = self.context.socket(zmq.PUB)
         self.pubsub_socket.bind(self.pubsub_connection_string)
 
+    def _parse_message(self, msg: str) -> dict[str, str]:
+        """Parse a message into its components."""
+        result: dict[str, str] = {"raw": msg}
+        match = re.match(r"^\[([^\]]+)\]\s+([^:]+):\s*(.*)$", msg)
+        if match:
+            result["channel"] = match.group(1)
+            result["username"] = match.group(2)
+            result["content"] = match.group(3)
+        return result
+
     async def recv_message(self) -> bytes | None:
         """Receives messages from the socket, and determines if there's any
         content worth publishing."""
@@ -81,35 +100,65 @@ class ZeroServer:
 
         """
         decoded_msg = msg.decode("utf8").strip()
-        stripped_message = re.sub(r"^\[.+\] .+:", "", decoded_msg).strip()
-        if stripped_message and self.verbose:
-            self.console.print(f"[dim][{time.ctime()}][/dim] [cyan]RECV:[/cyan] '{decoded_msg}'")
+        parsed = self._parse_message(decoded_msg)
+        content = parsed.get("content", "").strip()
 
-        # If there's anything left after stripping off the channel prefix, then
-        # we have a non-empty message; forward it on.
-        if stripped_message:
+        if content:
+            self.logger.info(
+                "Message received",
+                extra={
+                    "event": "message_received",
+                    "channel": parsed.get("channel", ""),
+                    "username": parsed.get("username", ""),
+                },
+            )
+            if self.verbose:
+                self.console.print(f"[dim]RECV:[/dim] [cyan]{decoded_msg}[/cyan]")
             return decoded_msg.encode("utf8")
         return None
 
     async def publish_message(self, msg: bytes) -> None:
         await self.pubsub_socket.send(msg)
+        decoded_msg = msg.decode("utf8")
+        parsed = self._parse_message(decoded_msg)
+
+        self.logger.info(
+            "Message published",
+            extra={
+                "event": "message_published",
+                "channel": parsed.get("channel", ""),
+                "username": parsed.get("username", ""),
+            },
+        )
         if self.verbose:
-            t = time.ctime()
-            decoded_msg = msg.decode("utf8")
-            self.console.print(f"[dim][{t}][/dim] [green]PUB:[/green] '{decoded_msg}'")
+            self.console.print(f"[dim]PUB:[/dim] [green]{decoded_msg}[/green]")
 
     async def run(self) -> None:
+        self.logger.info(
+            "Server starting",
+            extra={
+                "event": "server_start",
+                "host": self.host,
+                "recv_port": str(self.recv_port),
+                "pubsub_port": str(self.pubsub_port),
+            },
+        )
+
         self.console.print("\n[bold green]Zero Server running:[/bold green]")
         self.console.print(f" - Listening on [cyan]'{self.recv_connection_string}'[/cyan]")
         self.console.print(f" - Publishing to [cyan]'{self.pubsub_connection_string}'[/cyan]\n")
 
-        while True:
-            # Receive a message...
-            message = await self.recv_message()
+        try:
+            while True:
+                # Receive a message...
+                message = await self.recv_message()
 
-            # Publish the message for subscribers
-            if message:
-                await self.publish_message(message)
+                # Publish the message for subscribers
+                if message:
+                    await self.publish_message(message)
+        except Exception as e:
+            self.logger.exception("Server error", extra={"event": "server_error"})
+            raise e
 
 
 def main() -> None:
@@ -149,18 +198,38 @@ def main() -> None:
         action="store_true",
         help="Enable verbose output",
     )
+    # Log file argument
+    parser.add_argument(
+        "--log-file",
+        dest="log_file",
+        type=Path,
+        default=None,
+        help="Path to log file (default: ~/.zerochat/logs/server.log)",
+    )
+    # Log to console argument
+    parser.add_argument(
+        "--log-console",
+        dest="log_console",
+        action="store_true",
+        help="Also log to console (stderr)",
+    )
 
     params = parser.parse_args()
+    logger = setup_logging("zerochat.server", log_file=params.log_file, console=params.log_console)
+
     server = ZeroServer(
         host=params.host,
         pubsub_port=params.pubsub_port,
         recv_port=params.recv_port,
         verbose=params.verbose,
+        log_file=params.log_file,
+        log_to_console=params.log_console,
     )
 
     try:
         asyncio.run(server.run())
     except KeyboardInterrupt:
+        logger.info("Server stopped by user", extra={"event": "server_stop"})
         Console().print("\n[bold red]Server stopped.[/bold red]")
 
 
