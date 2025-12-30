@@ -1,8 +1,8 @@
 # zerochat
 
 [![Tests](https://github.com/bradmontgomery/zerochat/actions/workflows/tests.yml/badge.svg)](https://github.com/bradmontgomery/zerochat/actions/workflows/tests.yml)
-[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/bradmontgomery/zerochat)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE.txt)
+[![GitHub tag](https://img.shields.io/github/v/tag/bradmontgomery/zerochat?label=latest)](https://github.com/bradmontgomery/zerochat/tags)
+[![License](https://img.shields.io/github/license/bradmontgomery/zerochat)](LICENSE.txt)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
 A simple, command-line chat server and client using ZeroMQ with async I/O.
