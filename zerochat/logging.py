@@ -6,8 +6,10 @@ Provides JSON-formatted logging to file by default, with optional console output
 
 from __future__ import annotations
 
+import json
 import logging
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -21,9 +23,6 @@ class StructuredFormatter(logging.Formatter):
     """JSON-structured log formatter."""
 
     def format(self, record: logging.LogRecord) -> str:
-        import json
-        from datetime import datetime, timezone
-
         log_entry: dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,

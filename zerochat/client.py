@@ -166,15 +166,11 @@ class ZeroClient:
         )
         self.console.print("[dim]Type your message and press Enter to send.[/dim]\n")
 
-        try:
-            # Run input reading and message receiving concurrently
-            await asyncio.gather(
-                self.read_and_send(),
-                self.receive(),
-            )
-        except Exception as e:
-            self.logger.exception("Client error", extra={"event": "client_error"})
-            raise e
+        # Run input reading and message receiving concurrently
+        await asyncio.gather(
+            self.read_and_send(),
+            self.receive(),
+        )
 
 
 def main() -> None:
@@ -235,8 +231,6 @@ def main() -> None:
         console.print(f"[bold red]Error:[/bold red] {e}")
         sys.exit(1)
 
-    logger = setup_logging("zerochat.client", log_file=params.log_file, console=params.log_console)
-
     client = ZeroClient(
         channel=validated_channel,
         username=validated_username,
@@ -250,7 +244,7 @@ def main() -> None:
     try:
         asyncio.run(client.run())
     except KeyboardInterrupt:
-        logger.info(
+        client.logger.info(
             "Client disconnected by user",
             extra={
                 "event": "client_disconnect",

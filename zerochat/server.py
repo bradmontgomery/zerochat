@@ -145,17 +145,13 @@ class ZeroServer:
         self.console.print(f" - Listening on [cyan]'{self.recv_connection_string}'[/cyan]")
         self.console.print(f" - Publishing to [cyan]'{self.pubsub_connection_string}'[/cyan]\n")
 
-        try:
-            while True:
-                # Receive a message...
-                message = await self.recv_message()
+        while True:
+            # Receive a message...
+            message = await self.recv_message()
 
-                # Publish the message for subscribers
-                if message:
-                    await self.publish_message(message)
-        except Exception as e:
-            self.logger.exception("Server error", extra={"event": "server_error"})
-            raise e
+            # Publish the message for subscribers
+            if message:
+                await self.publish_message(message)
 
 
 def main() -> None:
@@ -206,7 +202,6 @@ def main() -> None:
     )
 
     params = parser.parse_args()
-    logger = setup_logging("zerochat.server", log_file=params.log_file, console=params.log_console)
 
     server = ZeroServer(
         host=params.host,
@@ -220,7 +215,7 @@ def main() -> None:
     try:
         asyncio.run(server.run())
     except KeyboardInterrupt:
-        logger.info("Server stopped by user", extra={"event": "server_stop"})
+        server.logger.info("Server stopped by user", extra={"event": "server_stop"})
         Console().print("\n[bold red]Server stopped.[/bold red]")
 
 
