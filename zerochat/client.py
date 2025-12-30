@@ -9,73 +9,84 @@ TODO:
 
 """
 
+from __future__ import annotations
+
 import argparse
 from sys import stdout
+from typing import NoReturn
 
 import zmq
 
 from .reader import NonblockingStdinReader
 
-CHANNEL = "GLOBAL"  # The default channel for messages
-HOST = "localhost"  # Server Hostname or address
-PUBSUB_PORT = "5555"  # Server's Pub/Sub port
-SEND_PORT = "5556"  # Server's Recv port
+CHANNEL: str = "GLOBAL"  # The default channel for messages
+HOST: str = "localhost"  # Server Hostname or address
+PUBSUB_PORT: str = "5555"  # Server's Pub/Sub port
+SEND_PORT: str = "5556"  # Server's Recv port
 
 
-class ZeroClient(object):
-    def __init__(self, *args, **kwargs):
-        self.username = kwargs.get("username", "Anon")
-        self.host = kwargs.get("host", HOST)
+class ZeroClient:
+    def __init__(
+        self,
+        *,
+        username: str = "Anon",
+        host: str = HOST,
+        channel: str = CHANNEL,
+        send_port: str | int = SEND_PORT,
+        pubsub_port: str | int = PUBSUB_PORT,
+    ) -> None:
+        self.username: str = username
+        self.host: str = host
 
         # Set the channel string; format is `[channel_name]`
-        channel = kwargs.get("channel", CHANNEL).strip().upper()
-        self.channel = f"[{channel}]"
+        self.channel: str = f"[{channel.strip().upper()}]"
 
-        self.send_port = kwargs.get("send_port", SEND_PORT)
-        self.send_connection_string = f"tcp://{self.host}:{self.send_port}"
+        self.send_port: str | int = send_port
+        self.send_connection_string: str = f"tcp://{self.host}:{self.send_port}"
 
-        self.pubsub_port = kwargs.get("pubsub_port", PUBSUB_PORT)
-        self.pubsub_connection_string = f"tcp://{self.host}:{self.pubsub_port}"
+        self.pubsub_port: str | int = pubsub_port
+        self.pubsub_connection_string: str = f"tcp://{self.host}:{self.pubsub_port}"
 
         self._create_context()
         self._create_send_socket()
         self._create_pubsub_socket()
 
         # to do non-blocking reads from stdin
-        self.reader = NonblockingStdinReader()
+        self.reader: NonblockingStdinReader = NonblockingStdinReader()
 
-    def _create_context(self):
-        self.context = zmq.Context()
+    def _create_context(self) -> None:
+        self.context: zmq.Context[zmq.Socket[bytes]] = zmq.Context()
 
-    def _create_send_socket(self):
-        self.send_socket = self.context.socket(zmq.PUSH)
+    def _create_send_socket(self) -> None:
+        self.send_socket: zmq.Socket[bytes] = self.context.socket(zmq.PUSH)
         self.send_socket.connect(self.send_connection_string)
 
-    def _create_pubsub_socket(self):
-        self.pubsub_socket = self.context.socket(zmq.SUB)
+    def _create_pubsub_socket(self) -> None:
+        self.pubsub_socket: zmq.Socket[bytes] = self.context.socket(zmq.SUB)
         self.pubsub_socket.connect(self.pubsub_connection_string)
 
         # Subscribe to the given channel
         self.pubsub_socket.setsockopt(zmq.SUBSCRIBE, self.channel.encode("utf8"))
 
-    def _format_message(self, msg):
+    def _format_message(self, msg: str) -> str:
         """Adds in the Channel information."""
         return f"{self.channel} {self.username}: {msg}"
 
-    def read_input(self):
+    def read_input(self) -> str | None:
         """Reads user input from the Terminal."""
         self.reader.read()
         msg = self.reader.get_input()
         if msg:
             return msg
+        return None
 
-    def send(self, msg):
+    def send(self, msg: str | None) -> None:
         """Send messages to the server."""
         if msg:
             msg = self._format_message(msg)
             self.send_socket.send(msg.encode("utf8"))
 
-    def receive(self, timeout=100):
+    def receive(self, timeout: int = 100) -> None:
         """Receive/print any published messages.
 
         Uses polling to keep from blocking when there are no messages to
@@ -89,12 +100,12 @@ class ZeroClient(object):
             if msg:
                 self.print_message(msg.decode("utf8"))
 
-    def print_message(self, msg):
+    def print_message(self, msg: str) -> None:
         """Prints received messages to stdout."""
         stdout.write(f"\n{msg}\n")
         stdout.flush()
 
-    def run(self):
+    def run(self) -> NoReturn:
         while True:
             msg = self.read_input()  # Read input message from user
             self.send(msg)  # Send messages to chat server

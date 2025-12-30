@@ -4,24 +4,27 @@ A non-blocking stdin reader.
 Inspired by: http://goo.gl/Ts9fJ
 
 """
+from __future__ import annotations
+
 from select import select
 from sys import stdin, stdout
+from typing import TextIO
 
 
-class NonblockingStdinReader(object):
-    def __init__(self, *args, **kwargs):
-        self.stdin = stdin
-        self.timeout = kwargs.get("timeout", 0.1)  # seconds
-        self.input_value = ""
+class NonblockingStdinReader:
+    def __init__(self, *, timeout: float = 0.1) -> None:
+        self.stdin: TextIO = stdin
+        self.timeout: float = timeout  # seconds
+        self.input_value: str = ""
 
-    def print_input(self):
+    def print_input(self) -> None:
         """Print the input value (if it exists) to stdout & reset it to an
         empty string."""
         if self.input_value:
             stdout.write(f"{self.input_value}\n")
             self.input_value = ""
 
-    def get_input(self):
+    def get_input(self) -> str:
         """Return the input value (if it exists) & reset it to an empty
         string."""
         s = self.input_value
@@ -29,7 +32,7 @@ class NonblockingStdinReader(object):
             self.input_value = ""
         return s
 
-    def _read_file_list(self, file_list):
+    def _read_file_list(self, file_list: list[TextIO]) -> None:
         if file_list:
             for f in file_list:
                 line = f.readline()
@@ -38,7 +41,7 @@ class NonblockingStdinReader(object):
                 else:  # No more content
                     file_list.remove(f)
 
-    def read(self):
+    def read(self) -> None:
         read_list = select([self.stdin], [], [], self.timeout)[0]
         self._read_file_list(read_list)
 
