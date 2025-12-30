@@ -3,3 +3,7 @@
 .coveragerc
 *.swp
 *.pyc
+.venv/
+dist/
+*.egg-info/
+uv.lock

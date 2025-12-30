@@ -1,15 +1,14 @@
-PY_VER ?= 3.10
 SHELL := /bin/bash
 
 .PHONY: clean_env
 clean_env:
-	rm -Rf ./env
+	rm -Rf .venv
 
 .PHONY: build_env
 build_env:
-	python$(PY_VER) -m venv env
+	uv venv
 	@echo ""
-	@echo "********** Run \`source env/bin/activate\` before continuing **********"
+	@echo "********** Run \`source .venv/bin/activate\` before continuing **********"
 	@echo ""
 
 .PHONY: rebuild_env
@@ -17,21 +16,34 @@ rebuild_env: | clean_env build_env
 
 .PHONY: install
 install:
-	pip install --upgrade pip
-	pip install -r requirements.txt
-	pre-commit install
+	uv sync
+	uv run pre-commit install
 
-.PHONY: compile
-compile:
-	pip install --upgrade pip pip-tools pre-commit
-	pip-compile -rU  --no-emit-index-url -o requirements.txt requirements.in
-	pre-commit autoupdate
+.PHONY: lock
+lock:
+	uv lock --upgrade
+	uv run pre-commit autoupdate
 
 .PHONY: build
 build:
-	python -m build
+	uv build
+
+.PHONY: test
+test:
+	uv run pytest
+
+.PHONY: lint
+lint:
+	uv run black --check zerochat/
+	uv run isort --check zerochat/
+	uv run flake8 zerochat/
+
+.PHONY: format
+format:
+	uv run black zerochat/
+	uv run isort zerochat/
 
 # TODO
 #.PHONY: upload
 #upload:
-#	python -m twine upload dist/*
+#	uv run twine upload dist/*
